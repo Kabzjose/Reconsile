@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+  Design language: a payments LEDGER, not a SaaS dashboard.
+  The subject is M-Pesa statements and passbooks — hairline-ruled tables with right-aligned,
+  tabular-figure amounts are how those actually look, not a decorative choice.
+
+  Palette: parchment paper + ink, with three meaning-carrying accents (never decorative):
+  green = money matched/settled, amber = waiting on a person, red = disputed.
+*/
+
+:root {
+  --paper: #eef0e7;
+  --paper-raised: #f7f8f2;
+  --ink: #1c2420;
+  --ink-soft: #5b6058;
+  --ink-faint: #8b9086;
+  --line: #d7d9c8;
+  --line-strong: #c3c6b1;
+
+  --green: #1f6d45;
+  --green-bg: #e2ecdf;
+  --amber: #93630b;
+  --amber-bg: #f4e8cf;
+  --red: #9c3320;
+  --red-bg: #f2ded6;
+  --slate: #52605f;
+  --slate-bg: #e3e7e2;
+
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-plex-sans);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-green: var(--green);
+  --color-green-bg: var(--green-bg);
+  --color-amber: var(--amber);
+  --color-amber-bg: var(--amber-bg);
+  --color-red: var(--red);
+  --color-red-bg: var(--red-bg);
+  --color-slate: var(--slate);
+  --color-slate-bg: var(--slate-bg);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numerals everywhere money or counts appear, so digits line up column-to-column. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+::selection {
+  background: var(--green);
+  color: var(--paper-raised);
+}
+
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* A single quiet fade for the one page-load moment (the first paint of a data table) —
+   not scattered per-element entrance animation. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enter {
+  animation: rise 240ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter {
+    animation: none;
+  }
+}

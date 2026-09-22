@@ -1,0 +1,241 @@
+// Reconcile — database schema (Phase 2)
+// Written for Prisma 6.x + PostgreSQL.
+//
+// Conventions
+//  - Money is ALWAYS integer cents (KES only). 2,500 KSh = 250000.
+//  - Every tenant-owned table carries business_id.
+//  - Financial rows are never cascade-deleted (onDelete: Restrict).
+//  - Timestamps are timestamptz (no timezone bugs).
+//  - Things Prisma can't express (CHECKs, partial indexes, triggers) live in
+//    constraints.sql and are applied as a custom migration.
+
+generator client {
+  provider = "prisma-client-js"
+  // Driver-adapter engine: queries run through @prisma/adapter-pg (pure JS + the `pg` driver),
+  // no native Rust query-engine binary at runtime. `prisma migrate` still uses the schema engine.
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Provider {
+  MPESA
+  BANK
+  STRIPE
+  MANUAL // cash and anything typed in by hand
+}
+
+enum OrderStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNMATCHED // nothing allocated, no suggestions
+  SUGGESTED // nothing allocated, but candidate matches await owner review
+  PARTIAL // some of the payment is allocated, remainder is not
+  MATCHED // fully allocated
+  DISPUTED
+}
+
+enum AllocationStatus {
+  SUGGESTED // engine proposal; does NOT count toward balances
+  ACTIVE // confirmed (auto or by owner); counts toward balances
+  VOIDED // rejected or corrected; kept forever for audit
+}
+
+enum AllocationSource {
+  AUTO_REFERENCE // exact reference + amount fits
+  AUTO_SCORE // high-confidence weighted score with a clear margin
+  MANUAL // owner chose it
+}
+
+enum EventSource {
+  WEBHOOK
+  CSV_IMPORT
+  SIMULATOR
+  MANUAL
+}
+
+enum EventOutcome {
+  RECEIVED // stored, not processed yet
+  PROCESSED // created a payment
+  DUPLICATE // payment already existed; ignored
+  INVALID // failed validation
+  FAILED // unexpected error; can be replayed
+}
+
+// ───────────────────────────── Tenancy ─────────────────────────────
+
+model Business {
+  id            String   @id @default(cuid())
+  name          String
+  webhookSecret String   @map("webhook_secret") // shared secret used to authenticate this business's webhook URL
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  users         User[]
+  customers     Customer[]
+  orders        Order[]
+  payments      Payment[]
+  paymentEvents PaymentEvent[]
+  allocations   Allocation[]
+
+  @@map("businesses")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  businessId   String   @map("business_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  business           Business     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  decidedAllocations Allocation[]
+
+  @@index([businessId])
+  @@map("users")
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  businessId String   @map("business_id")
+  name       String
+  phone      String? // normalised 2547XXXXXXXX; used as a matching signal
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  orders   Order[]
+
+  // Lets other tables point at (id, business_id) so cross-tenant links are impossible.
+  @@unique([id, businessId])
+  // One customer per phone per business (NULL phones are allowed and don't collide).
+  @@unique([businessId, phone])
+  @@map("customers")
+}
+
+// ───────────────────────────── Sales ─────────────────────────────
+
+model Order {
+  id             String      @id @default(cuid())
+  businessId     String      @map("business_id")
+  customerId     String?     @map("customer_id") // walk-ins have no customer
+  reference      String // e.g. ORD-1042; what the payer types as the account number
+  description    String?
+  amountCents    Int         @map("amount_cents")
+  allocatedCents Int         @default(0) @map("allocated_cents") // sum of ACTIVE allocations; CHECK-bounded
+  status         OrderStatus @default(UNPAID)
+  disputeNote    String?     @map("dispute_note")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business    Business     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  customer    Customer?    @relation(fields: [customerId, businessId], references: [id, businessId], onDelete: Restrict)
+  allocations Allocation[]
+
+  @@unique([businessId, reference])
+  @@unique([id, businessId])
+  // Powers "list open orders" and the dashboard's unpaid total.
+  @@index([businessId, status, createdAt])
+  @@map("orders")
+}
+
+// ───────────────────────────── Payments ─────────────────────────────
+
+model Payment {
+  id                String        @id @default(cuid())
+  businessId        String        @map("business_id")
+  provider          Provider
+  externalReference String        @map("external_reference") // provider's transaction id, e.g. QWE123
+  billReference     String?       @map("bill_reference") // what the payer typed as account no. (Paybill); primary matching signal
+  amountCents       Int           @map("amount_cents")
+  allocatedCents    Int           @default(0) @map("allocated_cents") // sum of ACTIVE allocations; CHECK-bounded
+  payerPhone        String?       @map("payer_phone")
+  payerName         String?       @map("payer_name")
+  status            PaymentStatus @default(UNMATCHED)
+  disputeNote       String?       @map("dispute_note")
+  paidAt            DateTime      @map("paid_at") @db.Timestamptz(3) // when the PAYER paid, not when we received it
+  metadata          Json? // provider-specific extras, kept as-is
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  business    Business       @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  events      PaymentEvent[]
+  allocations Allocation[]
+
+  // THE idempotency guarantee. A retried webhook or re-imported CSV row hits this and is ignored.
+  @@unique([businessId, provider, externalReference])
+  @@unique([id, businessId])
+  // Dashboard tiles and the "needs review" queue.
+  @@index([businessId, status])
+  // Recent transactions list.
+  @@index([businessId, paidAt(sort: Desc)])
+  // Reference-based matching lookup.
+  @@index([businessId, billReference])
+  @@map("payments")
+}
+
+// Every inbound event, stored BEFORE processing. Not unique on purpose:
+// retries are recorded (outcome = DUPLICATE) so you can see exactly what happened.
+model PaymentEvent {
+  id                String       @id @default(cuid())
+  businessId        String       @map("business_id")
+  paymentId         String?      @map("payment_id") // set once a payment was created (or already existed)
+  provider          Provider
+  source            EventSource
+  batchId           String?      @map("batch_id") // groups the rows of one CSV import
+  externalReference String?      @map("external_reference") // extracted transaction id, if the payload had one
+  rawPayload        Json         @map("raw_payload")
+  outcome           EventOutcome @default(RECEIVED)
+  error             String?
+  receivedAt        DateTime     @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt       DateTime?    @map("processed_at") @db.Timestamptz(3)
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  payment  Payment? @relation(fields: [paymentId, businessId], references: [id, businessId], onDelete: Restrict)
+
+  @@index([businessId, receivedAt(sort: Desc)])
+  @@index([businessId, outcome])
+  @@index([batchId])
+  @@map("payment_events")
+}
+
+// ───────────────────────────── Reconciliation ─────────────────────────────
+
+// The link between a payment and an order. Append-only: never edited, never deleted.
+// Wrong match? VOID it and create another.
+model Allocation {
+  id            String           @id @default(cuid())
+  businessId    String           @map("business_id")
+  paymentId     String           @map("payment_id")
+  orderId       String           @map("order_id")
+  amountCents   Int              @map("amount_cents")
+  confidence    Int // 0-100
+  source        AllocationSource
+  status        AllocationStatus
+  signals       Json? // score breakdown, e.g. {"reference":50,"amount":30,"phone":5} — "why 94%?"
+  decidedById   String?          @map("decided_by_id") // user who confirmed/voided, if a human did
+  voidReason    String?          @map("void_reason")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  confirmedAt   DateTime?        @map("confirmed_at") @db.Timestamptz(3)
+  voidedAt      DateTime?        @map("voided_at") @db.Timestamptz(3)
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  // Composite FKs: payment, order and allocation must belong to the SAME business.
+  payment   Payment  @relation(fields: [paymentId, businessId], references: [id, businessId], onDelete: Restrict)
+  order     Order    @relation(fields: [orderId, businessId], references: [id, businessId], onDelete: Restrict)
+  decidedBy User?    @relation(fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([businessId, status])
+  @@map("allocations")
+}

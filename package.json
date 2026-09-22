@@ -1,0 +1,24 @@
+{
+  "name": "reconcile",
+  "version": "0.1.0",
+  "description": "Reconcile — automatic payment reconciliation for small businesses",
+  "private": true,
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --if-present dev",
+    "dev:api": "pnpm --filter @reconcile/api dev",
+    "dev:web": "pnpm --filter @reconcile/web dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm --filter @reconcile/api test",
+    "test:integration": "pnpm --filter @reconcile/api test:integration",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm --filter @reconcile/web lint",
+    "db:setup": "pnpm --filter @reconcile/api db:setup",
+    "db:migrate": "pnpm --filter @reconcile/api db:migrate",
+    "db:seed": "pnpm --filter @reconcile/api db:seed",
+    "db:studio": "pnpm --filter @reconcile/api db:studio"
+  }
+}

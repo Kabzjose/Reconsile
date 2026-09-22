@@ -1,0 +1,16 @@
+# Local PostgreSQL for development:  docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reconcile
+      POSTGRES_PASSWORD: reconcile
+      POSTGRES_DB: reconcile
+    ports:
+      - "5432:5432"
+    volumes:
+      - reconcile_pgdata:/var/lib/postgresql/data
+
+volumes:
+  reconcile_pgdata:
