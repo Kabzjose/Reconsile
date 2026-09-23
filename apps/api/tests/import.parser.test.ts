@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAmountCents, parseParty, parseStatement, parseStatementDate } from '../src/modules/imports/import.parser';
+import { parseAmountCents, parseOrders, parseParty, parseStatement, parseStatementDate } from '../src/modules/imports/import.parser';
 
 describe('parseAmountCents', () => {
   it.each([
@@ -113,5 +113,44 @@ describe('parseStatement: header aliasing and messy files', () => {
   it('is quantity-accurate: rows read = imported + skipped + invalid, always', () => {
     const result = parseStatement(mpesaCsv);
     expect(result.rows.length + result.skipped + result.issues.length).toBe(4);
+  });
+});
+
+describe('parseOrders', () => {
+  it('imports order rows with optional customer details', () => {
+    const csv = [
+      'Reference,Amount,Description,Customer Name,Customer Phone,Date',
+      ' ord-1042 ,2500.00,Catering,John Mwangi,0712345678,2026-09-21 10:32:00',
+    ].join('\n');
+    const result = parseOrders(csv);
+
+    expect(result.columns.reference).toBe('Reference');
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      reference: 'ORD-1042',
+      amountCents: 250000,
+      description: 'Catering',
+      customerName: 'John Mwangi',
+      customerPhone: '254712345678',
+    });
+    expect(result.rows[0]!.createdAt?.toISOString()).toBe('2026-09-21T07:32:00.000Z');
+  });
+
+  it('understands invoice-style headers', () => {
+    const csv = ['Invoice No,Total,Client,Mobile', 'INV-1,1000,Jane,254700000001'].join('\n');
+    expect(parseOrders(csv).rows[0]).toMatchObject({ reference: 'INV-1', amountCents: 100000, customerName: 'Jane' });
+  });
+
+  it('reports invalid rows and keeps parsing the rest', () => {
+    const csv = ['Reference,Amount,Phone', 'bad ref,100,0712345678', 'ORD-2,nope,0712345678', 'ORD-3,300,not-a-phone', 'ORD-4,400,0712345678'].join('\n');
+    const result = parseOrders(csv);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]!.reference).toBe('ORD-4');
+    expect(result.issues).toHaveLength(3);
+  });
+
+  it('throws a clear error when no usable header exists', () => {
+    expect(() => parseOrders('Name,Notes\nJohn,hello')).toThrow(/reference and amount/i);
   });
 });

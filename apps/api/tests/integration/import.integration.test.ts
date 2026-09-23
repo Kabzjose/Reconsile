@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { prisma } from '../../src/infrastructure/database/prisma';
-import { buildSampleStatement, importPayments } from '../../src/modules/imports/import.service';
+import { buildSampleStatement, importOrders, importPayments } from '../../src/modules/imports/import.service';
 import { processWebhook } from '../../src/modules/webhooks/webhook.service';
 import { signBody } from '../../src/modules/webhooks/webhook.signature';
 import { createBusiness, createOrder } from './helpers';
@@ -65,5 +65,25 @@ describe('CSV import, against a real database', () => {
 
     expect(summary.invalidRows).toBe(0); // everything our own generator writes must parse cleanly
     expect(summary.imported).toBeGreaterThan(0);
+  });
+
+  it('imports orders, creates customers from phone details, and skips duplicate references on retry', async () => {
+    const business = await createBusiness();
+    const csv = [
+      'Reference,Amount,Description,Customer Name,Customer Phone,Date',
+      'ORD-1042,2500.00,Catering,John Mwangi,0712345678,2026-09-21 10:32:00',
+      'ORD-1043,1800.00,Delivery,John Mwangi,0712345678,2026-09-21 10:40:00',
+    ].join('\n');
+
+    const first = await importOrders(business.id, csv);
+    expect(first.imported).toBe(2);
+    expect(first.customersCreated).toBe(1);
+    expect(first.invalidRows).toBe(0);
+
+    const second = await importOrders(business.id, csv);
+    expect(second.imported).toBe(0);
+    expect(second.duplicates).toBe(2);
+    expect(await prisma.order.count({ where: { businessId: business.id } })).toBe(2);
+    expect(await prisma.customer.count({ where: { businessId: business.id } })).toBe(1);
   });
 });

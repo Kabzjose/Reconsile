@@ -2,7 +2,7 @@ import express, { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, requireAuth } from '../../middleware/authenticate';
 import { validateBody } from '../../middleware/validate';
-import { buildSampleStatement, importPayments } from './import.service';
+import { buildSampleStatement, importOrders, importPayments } from './import.service';
 
 export const importRouter = Router();
 
@@ -14,9 +14,18 @@ const importSchema = z.object({
   provider: z.enum(['MPESA', 'BANK']).default('MPESA'),
 });
 
+const orderImportSchema = z.object({
+  csv: z.string().min(1, 'The file is empty').max(5_000_000, 'The file is larger than 5 MB'),
+});
+
 importRouter.post('/payments', express.json({ limit: '6mb' }), validateBody(importSchema), async (req, res) => {
   const { businessId } = requireAuth(req);
   res.json({ data: await importPayments(businessId, req.body.csv, req.body.provider) });
+});
+
+importRouter.post('/orders', express.json({ limit: '6mb' }), validateBody(orderImportSchema), async (req, res) => {
+  const { businessId } = requireAuth(req);
+  res.json({ data: await importOrders(businessId, req.body.csv) });
 });
 
 importRouter.get('/sample', async (req, res) => {

@@ -41,6 +41,23 @@ export interface ParseResult {
   columns: Record<string, string>;
 }
 
+export interface ParsedOrderRow {
+  line: number;
+  reference: string;
+  amountCents: number;
+  description?: string;
+  customerName?: string;
+  customerPhone?: string;
+  createdAt?: Date;
+  raw: Record<string, string>;
+}
+
+export interface OrderParseResult {
+  rows: ParsedOrderRow[];
+  issues: RowIssue[];
+  columns: Record<string, string>;
+}
+
 const ALIASES = {
   id: ['receiptno', 'receiptnumber', 'receipt', 'transactionid', 'transid', 'transactioncode', 'mpesareceiptno', 'mpesareceipt', 'txnid', 'reference number'],
   time: ['completiontime', 'transactiontime', 'transtime', 'datetime', 'date', 'time', 'paidat', 'initiationtime'],
@@ -53,6 +70,17 @@ const ALIASES = {
 } as const;
 
 type Field = keyof typeof ALIASES;
+
+const ORDER_ALIASES = {
+  reference: ['reference', 'orderreference', 'orderno', 'ordernumber', 'orderid', 'invoice', 'invoiceno', 'invoicenumber', 'saleid'],
+  amount: ['amount', 'total', 'ordertotal', 'invoiceamount', 'amountdue', 'balance', 'price', 'subtotal'],
+  description: ['description', 'details', 'notes', 'item', 'items', 'service'],
+  customerName: ['customer', 'customername', 'client', 'clientname', 'name'],
+  customerPhone: ['phone', 'phonenumber', 'customerphone', 'mobile', 'msisdn', 'tel', 'telephone'],
+  createdAt: ['date', 'createdat', 'orderdate', 'invoicedate', 'sale date'],
+} as const;
+
+type OrderField = keyof typeof ORDER_ALIASES;
 
 const squash = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -121,13 +149,34 @@ function findHeader(records: string[][]): { index: number; map: Partial<Record<F
   return null;
 }
 
-export function parseStatement(csvText: string): ParseResult {
-  let records: string[][];
+function findOrderHeader(records: string[][]): { index: number; map: Partial<Record<OrderField, number>> } | null {
+  for (let i = 0; i < Math.min(records.length, 30); i++) {
+    const cells = records[i]!.map(squash);
+    const map: Partial<Record<OrderField, number>> = {};
+    for (const field of Object.keys(ORDER_ALIASES) as OrderField[]) {
+      for (const alias of ORDER_ALIASES[field]) {
+        const at = cells.indexOf(squash(alias));
+        if (at !== -1) {
+          map[field] = at;
+          break;
+        }
+      }
+    }
+    if (map.reference !== undefined && map.amount !== undefined) return { index: i, map };
+  }
+  return null;
+}
+
+function parseCsvRecords(csvText: string): string[][] {
   try {
-    records = parse(csvText, { bom: true, relax_column_count: true, relax_quotes: true, skip_empty_lines: true, trim: true });
+    return parse(csvText, { bom: true, relax_column_count: true, relax_quotes: true, skip_empty_lines: true, trim: true });
   } catch (error) {
     throw new ValidationError(`That file could not be read as CSV (${error instanceof Error ? error.message : 'unknown error'})`);
   }
+}
+
+export function parseStatement(csvText: string): ParseResult {
+  const records = parseCsvRecords(csvText);
 
   const header = findHeader(records);
   if (!header) {
@@ -216,4 +265,89 @@ export function parseStatement(csvText: string): ParseResult {
   }
 
   return { rows, issues, skipped, columns };
+}
+
+export function parseOrders(csvText: string): OrderParseResult {
+  const records = parseCsvRecords(csvText);
+  const header = findOrderHeader(records);
+  if (!header) {
+    const first = records[0]?.filter(Boolean).slice(0, 8).join(', ') ?? '(empty file)';
+    throw new ValidationError(
+      `Could not find the columns we need. The file must have an order reference and amount column (for example "Reference", "Amount"). The first line reads: ${first}`,
+    );
+  }
+
+  const { index: headerIndex, map } = header;
+  const headerCells = records[headerIndex]!;
+  const columns: Record<string, string> = {};
+  for (const [field, at] of Object.entries(map)) columns[field] = headerCells[at as number] ?? '';
+
+  const rows: ParsedOrderRow[] = [];
+  const issues: RowIssue[] = [];
+
+  for (let i = headerIndex + 1; i < records.length; i++) {
+    const cells = records[i]!;
+    const line = i + 1;
+    const get = (field: OrderField) => (map[field] !== undefined ? (cells[map[field]!] ?? '').trim() : '');
+
+    if (cells.every((cell) => !cell)) continue;
+    if (/^(total|summary|closing|opening)/i.test(cells[0] ?? '')) continue;
+
+    const raw: Record<string, string> = {};
+    headerCells.forEach((name, at) => {
+      if (name) raw[name] = cells[at] ?? '';
+    });
+
+    const referenceText = get('reference');
+    const reference = referenceText ? normalizeReference(referenceText) : '';
+    if (!reference) {
+      issues.push({ line, message: 'Missing order reference' });
+      continue;
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9\-_/.]*$/.test(reference) || reference.length > 40) {
+      issues.push({ line, message: `Order reference "${referenceText}" must use letters, numbers and - _ / . only` });
+      continue;
+    }
+
+    const amountText = get('amount');
+    const amountCents = amountText ? parseAmountCents(amountText) : null;
+    if (!amountCents || amountCents <= 0) {
+      issues.push({ line, message: amountText ? `Could not read the amount "${amountText}"` : 'Missing amount' });
+      continue;
+    }
+    if (amountCents > MAX_AMOUNT_CENTS) {
+      issues.push({ line, message: 'Amount is larger than the supported maximum' });
+      continue;
+    }
+
+    const dateText = get('createdAt');
+    const createdAt = dateText ? (parseStatementDate(dateText) ?? undefined) : undefined;
+    if (dateText && !createdAt) {
+      issues.push({ line, message: `Could not read the date "${dateText}" (use yyyy-mm-dd hh:mm or dd/mm/yyyy hh:mm)` });
+      continue;
+    }
+
+    const phoneText = get('customerPhone');
+    const customerPhone = phoneText ? (normalizeKenyanPhone(phoneText) ?? undefined) : undefined;
+    if (phoneText && !customerPhone) {
+      issues.push({ line, message: `Could not read the customer phone "${phoneText}"` });
+      continue;
+    }
+
+    const description = get('description');
+    const customerName = get('customerName');
+
+    rows.push({
+      line,
+      reference,
+      amountCents,
+      description: description || undefined,
+      customerName: customerName || undefined,
+      customerPhone,
+      createdAt,
+      raw,
+    });
+  }
+
+  return { rows, issues, columns };
 }

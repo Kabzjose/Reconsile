@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { Prisma, Provider } from '@prisma/client';
+import { Prisma, type Provider } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
 import { ValidationError } from '../../shared/errors';
 import { receivePayment } from '../payments/payment.receive';
-import { parseStatement, type RowIssue } from './import.parser';
+import { parseOrders, parseStatement, type RowIssue } from './import.parser';
 
 const MAX_ROWS = 2000;
 
@@ -17,6 +17,18 @@ export interface ImportSummary {
   suggested: number;
   needsReview: number;
   skippedRows: number;
+  invalidRows: number;
+  failed: number;
+  errors: RowIssue[];
+}
+
+export interface OrderImportSummary {
+  batchId: string;
+  columns: Record<string, string>;
+  rowsRead: number;
+  imported: number;
+  duplicates: number;
+  customersCreated: number;
   invalidRows: number;
   failed: number;
   errors: RowIssue[];
@@ -76,6 +88,88 @@ export async function importPayments(businessId: string, csv: string, provider: 
       else if (outcome === 'SUGGESTED') summary.suggested++;
       else summary.needsReview++;
     } catch (error) {
+      summary.failed++;
+      summary.errors.push({ line: row.line, message: error instanceof Error ? error.message : 'Unexpected error' });
+    }
+  }
+
+  summary.errors = summary.errors.slice(0, 50);
+  return summary;
+}
+
+export async function importOrders(businessId: string, csv: string): Promise<OrderImportSummary> {
+  const parsed = parseOrders(csv);
+  if (parsed.rows.length > MAX_ROWS) {
+    throw new ValidationError(`That file has ${parsed.rows.length} orders; import at most ${MAX_ROWS} at a time. Split the file by date.`);
+  }
+
+  const batchId = randomUUID();
+  const summary: OrderImportSummary = {
+    batchId,
+    columns: parsed.columns,
+    rowsRead: parsed.rows.length + parsed.issues.length,
+    imported: 0,
+    duplicates: 0,
+    customersCreated: 0,
+    invalidRows: parsed.issues.length,
+    failed: 0,
+    errors: [...parsed.issues],
+  };
+
+  for (const row of parsed.rows) {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const existingOrder = await tx.order.findUnique({ where: { businessId_reference: { businessId, reference: row.reference } } });
+        if (existingOrder) return { duplicate: true, customerCreated: false };
+
+        let customerId: string | undefined;
+        let customerCreated = false;
+
+        if (row.customerPhone) {
+          const existingCustomer = await tx.customer.findUnique({ where: { businessId_phone: { businessId, phone: row.customerPhone } } });
+          if (existingCustomer) {
+            customerId = existingCustomer.id;
+            if (row.customerName && existingCustomer.name !== row.customerName) {
+              await tx.customer.update({ where: { id: existingCustomer.id }, data: { name: row.customerName } });
+            }
+          } else {
+            const customer = await tx.customer.create({
+              data: { businessId, name: row.customerName ?? row.customerPhone, phone: row.customerPhone },
+            });
+            customerId = customer.id;
+            customerCreated = true;
+          }
+        } else if (row.customerName) {
+          const customer = await tx.customer.create({ data: { businessId, name: row.customerName } });
+          customerId = customer.id;
+          customerCreated = true;
+        }
+
+        await tx.order.create({
+          data: {
+            businessId,
+            reference: row.reference,
+            description: row.description,
+            amountCents: row.amountCents,
+            customerId,
+            ...(row.createdAt ? { createdAt: row.createdAt } : {}),
+          },
+        });
+
+        return { duplicate: false, customerCreated };
+      });
+
+      if (result.duplicate) {
+        summary.duplicates++;
+        continue;
+      }
+      summary.imported++;
+      if (result.customerCreated) summary.customersCreated++;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        summary.duplicates++;
+        continue;
+      }
       summary.failed++;
       summary.errors.push({ line: row.line, message: error instanceof Error ? error.message : 'Unexpected error' });
     }
