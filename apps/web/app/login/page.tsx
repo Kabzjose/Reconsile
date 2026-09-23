@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { Field, inputClass } from "@/components/Field";
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState("demo@reconcile.app");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +45,24 @@ export default function LoginPage() {
           <input className={inputClass} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
         </Field>
         <Field label="Password">
-          <input className={inputClass} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <span className="relative block">
+            <input
+              className={`${inputClass} pr-10`}
+              type={showPassword ? "text" : "password"}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-[3px] text-ink-faint transition-colors hover:bg-paper hover:text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </span>
         </Field>
         <Button type="submit" variant="primary" disabled={loading} className="mt-1 w-full py-2">
           {loading ? <Spinner className="h-4 w-4" /> : "Log in"}
