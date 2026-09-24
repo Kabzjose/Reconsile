@@ -1,15 +1,33 @@
 @import "tailwindcss";
 
-/*
-  Design language: a payments LEDGER, not a SaaS dashboard.
-  The subject is M-Pesa statements and passbooks — hairline-ruled tables with right-aligned,
-  tabular-figure amounts are how those actually look, not a decorative choice.
-
-  Palette: parchment paper + ink, with three meaning-carrying accents (never decorative):
-  green = money matched/settled, amber = waiting on a person, red = disputed.
-*/
-
 :root {
+  --paper: #0a0a0c;
+  --paper-raised: #121317;
+  --ink: #ededed;
+  --ink-soft: #9ca3af;
+  --ink-faint: #6b7280;
+  --line: #24262c;
+  --line-strong: #343740;
+  --green: #2dd4bf;
+  --green-bg: #123b39;
+  --amber: #f5a524;
+  --amber-bg: #3a2b13;
+  --red: #f1554c;
+  --red-bg: #3a1c1d;
+  --slate: #9ca3af;
+  --slate-bg: #202228;
+  --accent: #2dd4bf;
+  --accent-hover: #14b8a6;
+  --font-display: var(--font-space-grotesk);
+  --font-sans: var(--font-plex-sans);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
   --paper: #eef0e7;
   --paper-raised: #f7f8f2;
   --ink: #1c2420;
@@ -17,7 +35,6 @@
   --ink-faint: #8b9086;
   --line: #d7d9c8;
   --line-strong: #c3c6b1;
-
   --green: #1f6d45;
   --green-bg: #e2ecdf;
   --amber: #93630b;
@@ -26,9 +43,8 @@
   --red-bg: #f2ded6;
   --slate: #52605f;
   --slate-bg: #e3e7e2;
-
-  --font-display: var(--font-fraunces);
-  --font-sans: var(--font-plex-sans);
+  --accent: #147d70;
+  --accent-hover: #0f655b;
 }
 
 @theme inline {
@@ -47,6 +63,8 @@
   --color-red-bg: var(--red-bg);
   --color-slate: var(--slate);
   --color-slate-bg: var(--slate-bg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --font-display: var(--font-display);
   --font-sans: var(--font-sans);
 }
@@ -58,6 +76,14 @@
 html,
 body {
   height: 100%;
+}
+
+a {
+  transition: color 160ms ease;
+}
+
+a:hover {
+  color: var(--accent);
 }
 
 body {

@@ -67,8 +67,8 @@ export default function PaymentsPage() {
             <button
               key={f.label}
               onClick={() => setParams({ status: f.value?.join(","), page: undefined })}
-              className={`rounded-[3px] px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-                f === activeFilter ? "bg-ink text-paper-raised" : "text-ink-soft hover:text-ink"
+              className={`rounded-full px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                f === activeFilter ? "bg-accent text-paper" : "text-ink-soft hover:text-accent"
               }`}
             >
               {f.label}

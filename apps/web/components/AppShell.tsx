@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, ReceiptText, Wallet, Upload, FlaskConical, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { initials } from "@/lib/format";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -23,7 +24,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-full">
       <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-paper-raised">
         <div className="border-b border-line px-5 py-5">
-          <p className="font-display text-[20px] italic leading-tight text-ink">Reconcile</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-display text-[20px] font-bold leading-tight text-accent">Reconcile</p>
+            <ThemeToggle />
+          </div>
           <p className="mt-0.5 truncate text-[12px] text-ink-faint">{session?.business.name}</p>
         </div>
 
@@ -36,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-2.5 rounded-[3px] px-3 py-2 text-[13.5px] font-medium transition-colors ${
-                  active ? "bg-ink text-paper-raised" : "text-ink-soft hover:bg-paper hover:text-ink"
+                  active ? "border-l-2 border-accent bg-paper text-accent" : "border-l-2 border-transparent text-ink-soft hover:bg-paper hover:text-accent"
                 }`}
               >
                 <Icon size={16} strokeWidth={2} />
@@ -50,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/settings"
             className={`flex items-center gap-2.5 rounded-[3px] px-3 py-2 text-[13.5px] font-medium transition-colors ${
-              pathname === "/settings" ? "bg-ink text-paper-raised" : "text-ink-soft hover:bg-paper hover:text-ink"
+              pathname === "/settings" ? "border-l-2 border-accent bg-paper text-accent" : "border-l-2 border-transparent text-ink-soft hover:bg-paper hover:text-accent"
             }`}
           >
             <Settings size={16} />
@@ -84,7 +88,7 @@ export function PageHeader({ title, description, action }: { title: string; desc
   return (
     <header className="flex items-start justify-between gap-4 border-b border-line bg-paper-raised px-8 py-6">
       <div>
-        <h1 className="font-display text-[26px] italic leading-none text-ink">{title}</h1>
+        <h1 className="font-display text-[26px] font-bold leading-none text-ink">{title}</h1>
         {description ? <p className="mt-1.5 text-[13.5px] text-ink-soft">{description}</p> : null}
       </div>
       {action}

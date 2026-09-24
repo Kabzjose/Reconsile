@@ -50,8 +50,8 @@ export default function DashboardPage() {
               <button
                 key={r.value}
                 onClick={() => setRange(r.value)}
-                className={`rounded-[3px] px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
-                  range === r.value ? "bg-ink text-paper-raised" : "text-ink-soft hover:text-ink"
+                className={`rounded-full px-2.5 py-1 text-[12.5px] font-medium transition-colors ${
+                  range === r.value ? "bg-accent text-paper" : "text-ink-soft hover:text-accent"
                 }`}
               >
                 {r.label}

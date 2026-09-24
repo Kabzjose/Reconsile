@@ -72,7 +72,7 @@ export default function ImportPage() {
       <PageHeader title="Import CSV" description="Upload payments for matching, or sales orders for reconciliation." />
 
       <div className="mx-auto max-w-2xl px-8 py-8">
-        <div className="mb-5 flex gap-1 rounded-[4px] border border-line bg-paper-raised p-0.5 w-fit">
+        <div className="mb-5 flex gap-1 rounded-full border border-line bg-paper-raised p-0.5 w-fit">
           {(["payments", "orders"] as const).map((nextKind) => (
             <button
               key={nextKind}
@@ -82,8 +82,8 @@ export default function ImportPage() {
                 setSummary(null);
                 setError(null);
               }}
-              className={`rounded-[3px] px-3 py-1 text-[12.5px] font-medium transition-colors ${
-                kind === nextKind ? "bg-ink text-paper-raised" : "text-ink-soft hover:text-ink"
+                className={`rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors ${
+                kind === nextKind ? "bg-accent text-paper" : "text-ink-soft hover:text-accent"
               }`}
             >
               {nextKind === "payments" ? "Payments" : "Orders"}
@@ -121,13 +121,13 @@ export default function ImportPage() {
               </a>
             </div>
 
-            <div className="mb-4 flex gap-1 rounded-[4px] border border-line bg-paper-raised p-0.5 w-fit">
+            <div className="mb-4 flex gap-1 rounded-full border border-line bg-paper-raised p-0.5 w-fit">
               {(["MPESA", "BANK"] as const).map((p) => (
                 <button
                   key={p}
                   onClick={() => setProvider(p)}
-                  className={`rounded-[3px] px-3 py-1 text-[12.5px] font-medium transition-colors ${
-                    provider === p ? "bg-ink text-paper-raised" : "text-ink-soft hover:text-ink"
+                  className={`rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors ${
+                    provider === p ? "bg-accent text-paper" : "text-ink-soft hover:text-accent"
                   }`}
                 >
                   {p === "MPESA" ? "M-Pesa" : "Bank"}

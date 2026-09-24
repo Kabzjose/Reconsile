@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
-  weight: ["500", "600"],
-  style: ["normal", "italic"],
+  weight: ["500", "600", "700"],
 });
 
 const plexSans = IBM_Plex_Sans({
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${plexSans.variable} h-full`}>
+    <html lang="en" data-theme="dark" className={`${spaceGrotesk.variable} ${plexSans.variable} h-full`}>
       <body className="h-full">
         <AuthProvider>{children}</AuthProvider>
       </body>

@@ -45,7 +45,7 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout>
-      <p className="font-display text-[22px] italic text-ink">Set up your business</p>
+      <p className="font-display text-[22px] font-bold text-ink">Set up your business</p>
       <p className="mt-1 text-[13.5px] text-ink-soft">One account per business — you can invite your team later.</p>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
@@ -66,7 +66,7 @@ export default function RegisterPage() {
 
       <p className="mt-5 text-[13px] text-ink-soft">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-ink underline underline-offset-2">
+        <Link href="/login" className="font-medium text-accent underline underline-offset-2">
           Log in
         </Link>
       </p>

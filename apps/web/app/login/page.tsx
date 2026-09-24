@@ -36,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <p className="font-display text-[22px] italic text-ink">Welcome back</p>
+      <p className="font-display text-[22px] font-bold text-ink">Welcome back</p>
       <p className="mt-1 text-[13.5px] text-ink-soft">Log in to your reconciliation ledger.</p>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
@@ -71,7 +71,7 @@ export default function LoginPage() {
 
       <p className="mt-5 text-[13px] text-ink-soft">
         New here?{" "}
-        <Link href="/register" className="font-medium text-ink underline underline-offset-2">
+          <Link href="/register" className="font-medium text-accent underline underline-offset-2">
           Create a business account
         </Link>
       </p>
@@ -87,8 +87,8 @@ export default function LoginPage() {
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-paper px-4">
-      <div className="w-full max-w-sm rounded-[4px] border border-line bg-paper-raised p-7 shadow-[0_1px_0_var(--line)]">{children}</div>
+    <div className="flex min-h-full items-center justify-center bg-paper px-4 py-8">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-paper-raised p-7 shadow-[0_1px_0_var(--line)]">{children}</div>
     </div>
   );
 }
