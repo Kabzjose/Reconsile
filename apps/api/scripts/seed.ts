@@ -8,8 +8,10 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '../src/infrastructure/database/prisma';
 import { hashPassword } from '../src/shared/security/password';
 
+
+//demo account credentials
 const OWNER_EMAIL = 'demo@reconcile.app';
-const OWNER_PASSWORD = 'demo-password-1234';
+const OWNER_PASSWORD = 'password@123';
 
 const CUSTOMERS = [
   { name: 'John Mwangi', phone: '254712000001' },
