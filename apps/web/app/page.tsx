@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Command, Search, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { Button } from "@/components/Button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/lib/auth";
 
 export default function Root() {
-  const { session, loading } = useAuth();
+  const { session, loading, loginAsDemo } = useAuth();
 
   useEffect(() => {
     if (!loading && session) window.location.replace("/dashboard");
@@ -20,11 +20,7 @@ export default function Root() {
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-5 px-5 sm:px-8">
           <Link href="/" className="font-display text-xl font-bold text-accent hover:text-accent-hover">Reconcile</Link>
           <div className="hidden min-w-0 flex-1 sm:block">
-            <div className="mx-auto flex max-w-xs items-center gap-2 rounded-full border border-line bg-paper-raised px-3 py-2 text-xs text-ink-faint">
-              <Search size={14} />
-              <span className="flex-1">Search documentation</span>
-              <span className="flex items-center gap-1 rounded border border-line px-1.5 py-0.5 text-[10px]"><Command size={10} /> K</span>
-            </div>
+            
           </div>
           <div className="ml-auto flex items-center gap-4 text-sm text-ink-soft">
             <a href="#how-it-works" className="hidden md:inline">How it works</a>
@@ -44,6 +40,21 @@ export default function Root() {
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Link href="/register"><Button variant="primary" className="px-5 py-3">Get started free <ArrowRight size={16} /></Button></Link>
             <a href="#how-it-works"><Button variant="secondary" className="px-5 py-3">See how it works</Button></a>
+            <Button
+              
+              variant="primary" className="px-5 py-3"
+              onClick={async () => {
+                try {
+                  await loginAsDemo();
+                  window.location.replace("/dashboard");
+                } catch {
+                  window.location.href = "/login";
+                }
+              }}
+              disabled={loading || !!session}
+            >
+              Try The Live Demo <ArrowRight size={16} />
+            </Button>
           </div>
         </div>
         <div className="mt-20 grid max-w-5xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4">

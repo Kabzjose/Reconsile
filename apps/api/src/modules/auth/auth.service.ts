@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../infrastructure/database/prisma';
-import { ConflictError, UnauthorizedError } from '../../shared/errors';
+import { ConflictError, NotFoundError, UnauthorizedError } from '../../shared/errors';
 import { signToken } from '../../shared/security/jwt';
 import { hashPassword, verifyPassword } from '../../shared/security/password';
+import { OWNER_EMAIL } from '../../../scripts/seed';
 import type { LoginInput, RegisterInput } from './auth.schemas';
 
 // A real bcrypt hash of a random string. When the email doesn't exist we still run a
@@ -57,6 +58,21 @@ export async function login(input: LoginInput): Promise<AuthResult> {
     // Same message for both cases on purpose.
     throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
   }
+
+  return {
+    token: signToken({ userId: user.id, businessId: user.businessId }),
+    user: { id: user.id, email: user.email },
+    business: user.business,
+  };
+}
+
+export async function demoLogin(): Promise<AuthResult> {
+  const user = await prisma.user.findUnique({
+    where: { email: OWNER_EMAIL },
+    include: { business: { select: { id: true, name: true } } },
+  });
+
+  if (!user) throw new NotFoundError('Demo account is not set up. Run `pnpm db:seed`.');
 
   return {
     token: signToken({ userId: user.id, businessId: user.businessId }),

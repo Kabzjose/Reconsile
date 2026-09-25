@@ -15,6 +15,11 @@ export async function login(req: Request, res: Response) {
   res.json(result);
 }
 
+export async function demoLogin(_req: Request, res: Response) {
+  const result = await authService.demoLogin();
+  res.json(result);
+}
+
 export async function me(req: Request, res: Response) {
   const { userId } = requireAuth(req);
   res.json(await authService.getProfile(userId));

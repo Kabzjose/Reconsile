@@ -13,7 +13,7 @@ import { Spinner } from "@/components/Spinner";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginAsDemo } = useAuth();
   const [email, setEmail] = useState("demo@reconcile.app");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,6 +26,19 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      router.replace("/dashboard");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not reach the server. Is the API running?");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDemoLogin() {
+    setError(null);
+    setLoading(true);
+    try {
+      await loginAsDemo();
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not reach the server. Is the API running?");
@@ -69,18 +82,22 @@ export default function LoginPage() {
         </Button>
       </form>
 
+      <div className="mt-5 flex items-center gap-3 text-[12px] text-ink-faint">
+        <div className="h-px flex-1 bg-line" />
+        <span>or</span>
+        <div className="h-px flex-1 bg-line" />
+      </div>
+
+      <Button type="button" variant="secondary" disabled={loading} onClick={handleDemoLogin} className="mt-4 w-full py-2">
+        {loading ? <Spinner className="h-4 w-4" /> : "Continue with demo account"}
+      </Button>
+
       <p className="mt-5 text-[13px] text-ink-soft">
         New here?{" "}
-          <Link href="/register" className="font-medium text-accent underline underline-offset-2">
+        <Link href="/register" className="font-medium text-accent underline underline-offset-2">
           Create a business account
         </Link>
       </p>
-
-      <div className="mt-5 border-t border-line pt-4 text-[12.5px] text-ink-faint">
-        Demo login: <span className="tabular text-ink-soft">demo@reconcile.app</span> / <span className="tabular text-ink-soft">demo-password-1234</span>
-        <br />
-        (run <code className="text-ink-soft">pnpm db:seed</code> in <code className="text-ink-soft">apps/api</code> first)
-      </div>
     </AuthLayout>
   );
 }

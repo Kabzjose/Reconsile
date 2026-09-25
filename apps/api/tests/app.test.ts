@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createApp } from '../src/app';
+import { env } from '../src/config/env';
 import { prisma } from '../src/infrastructure/database/prisma';
 import { hashPassword } from '../src/shared/security/password';
 import { signToken, verifyToken } from '../src/shared/security/jwt';
@@ -157,6 +158,52 @@ describe('POST /api/auth/login', () => {
       expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
       expect(res.body.error.message).toBe('Invalid email or password');
     }
+  });
+});
+
+describe('POST /api/auth/demo', () => {
+  it('returns a token for the seeded demo account when enabled', async () => {
+    const original = env.DEMO_LOGIN_ENABLED;
+    env.DEMO_LOGIN_ENABLED = true;
+    db.findUser.mockResolvedValue({
+      id: 'user_1',
+      email: 'demo@reconcile.app',
+      businessId: 'biz_1',
+      passwordHash: await hashPassword('a-good-password'),
+      business: { id: 'biz_1', name: 'Mama Njeri Shop' },
+    });
+
+    const res = await request(app).post('/api/auth/demo');
+
+    expect(res.status).toBe(200);
+    expect(verifyToken(res.body.token).businessId).toBe('biz_1');
+    expect(res.body.user).toEqual({ id: 'user_1', email: 'demo@reconcile.app' });
+    expect(res.body.business.name).toBe('Mama Njeri Shop');
+    env.DEMO_LOGIN_ENABLED = original;
+  });
+
+  it('returns 404 when demo login is disabled', async () => {
+    const original = env.DEMO_LOGIN_ENABLED;
+    env.DEMO_LOGIN_ENABLED = false;
+
+    const res = await request(app).post('/api/auth/demo');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('NOT_FOUND');
+    env.DEMO_LOGIN_ENABLED = original;
+  });
+
+  it('returns a clear not found when the demo account has not been seeded', async () => {
+    const original = env.DEMO_LOGIN_ENABLED;
+    env.DEMO_LOGIN_ENABLED = true;
+    db.findUser.mockResolvedValue(null);
+
+    const res = await request(app).post('/api/auth/demo');
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('NOT_FOUND');
+    expect(res.body.error.message).toBe('Demo account is not set up. Run `pnpm db:seed`.');
+    env.DEMO_LOGIN_ENABLED = original;
   });
 });
 

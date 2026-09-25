@@ -8,10 +8,8 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '../src/infrastructure/database/prisma';
 import { hashPassword } from '../src/shared/security/password';
 
-
-//demo account credentials
-const OWNER_EMAIL = 'demo@reconcile.app';
-const OWNER_PASSWORD = 'password@123';
+export const OWNER_EMAIL = 'demo@reconcile.app';
+export const OWNER_PASSWORD = 'password@123';
 
 const CUSTOMERS = [
   { name: 'John Mwangi', phone: '254712000001' },
@@ -22,7 +20,7 @@ const CUSTOMERS = [
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
 
-async function main() {
+export async function resetDemoBusiness() {
   console.log(`Seeding demo business (owner: ${OWNER_EMAIL}) ...`);
 
   const passwordHash = await hashPassword(OWNER_PASSWORD);
@@ -76,11 +74,18 @@ async function main() {
   console.log('            that ambiguity is the reason the matching engine has to look past amount.');
   console.log('  Next:     start the API, log in, then POST /api/simulator/scenarios/CLEAN (etc.)');
   console.log('            or import GET /api/imports/sample to see reconciliation happen live.');
+  return business;
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+async function main() {
+  await resetDemoBusiness();
+}
+
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

@@ -19,6 +19,7 @@
     "db:setup": "pnpm --filter @reconcile/api db:setup",
     "db:migrate": "pnpm --filter @reconcile/api db:migrate",
     "db:seed": "pnpm --filter @reconcile/api db:seed",
+    "db:reset-demo": "pnpm --filter @reconcile/api db:reset-demo",
     "db:studio": "pnpm --filter @reconcile/api db:studio"
   }
 }

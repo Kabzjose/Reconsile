@@ -16,6 +16,7 @@ interface AuthContextValue {
   /** True until we've checked localStorage for an existing session, once, on first load. */
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginAsDemo: () => Promise<void>;
   register: (businessName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -55,6 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [apply],
   );
 
+  const loginAsDemo = useCallback(async () => {
+    apply(await api.post<AuthResult>("/api/auth/demo"));
+  }, [apply]);
+
   const register = useCallback(
     async (businessName: string, email: string, password: string) => {
       apply(await api.post<AuthResult>("/api/auth/register", { businessName, email, password }));
@@ -68,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   }, []);
 
-  return <AuthContext.Provider value={{ session, loading, login, register, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ session, loading, login, loginAsDemo, register, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
